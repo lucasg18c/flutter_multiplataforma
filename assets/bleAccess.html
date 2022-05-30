@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <h1>Acerque el celular a un acceso...</h1>
+
+    <input id="btnBuscar" type="button" value="Buscar" />
+
+    <h2>Conexión:</h2>
+    <h3 id="lblConexion">Ninguno</h3>
+    <p id="lblNotify">Respuesta</p>
+
+    <h2>Dispositivos</h2>
+    <div id="lista"></div>
+
+    <script>
+      const lista = document.getElementById("lista");
+      const lblConexion = document.getElementById("lblConexion");
+      const lblNotify = document.getElementById("lblNotify");
+      let devices = [];
+      let vinculado = null;
+      const UMBRAL_CONEXION = -30;
+
+      const estadoConexion = (conexion) => {
+        lblConexion.innerText = `MAC: ${conexion.mac} | Estado: ${conexion.estado}`;
+      };
+
+      const notify = (conexion) => {
+        lblNotify.innerText = `${conexion.estado}`;
+      };
+
+      const listar = () => {
+        let res = "";
+        for (let d of devices) {
+          res += `\n${d.rssi >= -30 ? "CONECTANDO | " : ""}MAC: ${
+            d.mac
+          } | RSSI: ${d.rssi}dB`;
+        }
+        return res;
+      };
+
+      const ordenar = () => {
+        for (let i = 0; i < devices.length - 1; i += 1) {
+          for (let j = i + 1; j < devices.length; j += 1) {
+            if (devices[i].rssi < devices[j].rssi) {
+              let temp = devices[i];
+              devices[i] = devices[j];
+              devices[j] = temp;
+            }
+          }
+        }
+      };
+
+      const esAccess = (device) => {
+        if (device.uuid.length == 0) {
+          return false;
+        }
+        const bytes = device.uuid.slice(0, 2);
+        console.log(bytes);
+        let id_factory = "";
+        let hex = "";
+        for (let b of bytes) {
+          hex = b.toString(16);
+          if (hex.length == 1) {
+            hex = "0" + hex;
+          }
+          id_factory += hex;
+        }
+        console.log(id_factory);
+        // En raw data se mandan al revés, parseado queda #FF87
+        return id_factory === "87ff";
+      };
+
+      const addDevice = (device) => {
+        let nuevo = true;
+        for (let d of devices) {
+          if (d.mac === device.mac) {
+            d.rssi = device.rssi;
+            nuevo = false;
+            break;
+          }
+        }
+
+        if (nuevo) {
+          if (!esAccess(device)) {
+            return;
+          }
+          devices.push(device);
+        }
+
+        if (device.rssi >= UMBRAL_CONEXION) {
+          if (!vinculado) {
+            vinculado = device;
+            lblConexion.innerText = `Petición para conectar: ${vinculado.mac}`;
+            window.flutter_inappwebview.callHandler("conectar", vinculado);
+          }
+        }
+
+        ordenar();
+        lista.innerText = listar();
+      };
+
+      document.getElementById("btnBuscar").addEventListener("click", () => {
+        window.flutter_inappwebview.callHandler("ble");
+      });
+    </script>
+  </body>
+</html>
